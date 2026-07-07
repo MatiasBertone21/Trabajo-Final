@@ -1,0 +1,41 @@
+# =========================
+# Dependencias de Node (Frontends)
+# =========================
+node_modules/
+dist/
+build/
+.npm/
+
+# =========================
+# Dependencias de Python (Backend)
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+env/
+.pytest_cache/
+
+# =========================
+# Variables de Entorno
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Archivos del Sistema y Editores (IDEs)
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# IDE
+.idea/
+.vscode/
