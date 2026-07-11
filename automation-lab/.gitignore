@@ -36,6 +36,7 @@ Thumbs.db
 *.sln
 *.sw?
 
-# IDE
-.idea/
-.vscode/
+# --- Docker ---
+backend/app/data/*.json
+!backend/app/data/products.json # Mantener 
+!backend/app/data/categories.json # Mantener 
