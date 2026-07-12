@@ -1,0 +1,24 @@
+# Automation Lab Roadmap
+
+## Phase 1
+- [x] Project architecture
+- [x] Docker setup
+- [x] Monorepo structure
+
+## Phase 2
+- [ ] Fake API
+
+## Phase 3
+- [ ] React Store
+
+## Phase 4
+- [ ] Shopping Cart
+
+## Phase 5
+- [ ] Angular Store
+
+## Phase 6
+- [ ] Vue Store
+
+## Phase 7
+- [ ] QA Playground
