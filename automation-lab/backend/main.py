@@ -5,13 +5,23 @@ import logging
 from app.api.endpoints import router as api_router
 from app.core.config import settings
 from app.utils.startup import init_data_files
+from fastapi.staticfiles import StaticFiles
+from pathlib import Path
 
+assets_path = Path("/app/assets")
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 init_data_files()
 app = FastAPI(title=settings.app_name, version=settings.version)
+
+# Mount static files for assets
+app.mount(
+    "/assets",
+    StaticFiles(directory=assets_path),
+    name="assets",
+)
 
 @app.get("/")
 def read_root():
