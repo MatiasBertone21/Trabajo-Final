@@ -19,4 +19,4 @@ El proyecto está dividido en microservicios gestionados a través de Docker Com
 ## Cómo ejecutar todo el entorno
 Para levantar todos los servicios al mismo tiempo, ejecuta en la raíz del proyecto:
 ```bash
-docker compose up --build
+docker compose up -d --build

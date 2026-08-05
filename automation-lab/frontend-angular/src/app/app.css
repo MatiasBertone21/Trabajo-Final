@@ -1,0 +1,20 @@
+:host {
+  display: block;
+  min-height: 100vh;
+}
+
+:host::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at top left, rgba(79, 70, 229, 0.12), transparent 25%),
+    radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.08), transparent 18%);
+  pointer-events: none;
+  z-index: -1;
+}
+
+router-outlet,
+main-layout {
+  display: block;
+}
+
