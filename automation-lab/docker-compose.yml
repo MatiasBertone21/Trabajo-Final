@@ -28,13 +28,12 @@ services:
     build: 
       context: ./frontend-angular
     ports:
-      - "4200:4200"
+      - "4200:80"
     container_name: automation-lab-angular
     depends_on:
       - backend
-    volumes:
-      - ./frontend-angular:/app
-      - /app/node_modules
+    environment:
+      VITE_API_BASE_URL: http://localhost:8000
 
   vue:
     build: 

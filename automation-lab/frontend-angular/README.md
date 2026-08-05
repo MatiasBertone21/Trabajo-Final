@@ -1,6 +1,36 @@
 # FrontendAngular
 
-This project was generated using [Angular CLI](https://github.com/angular/angular-cli) version 21.2.18.
+
+Run the Angular frontend with Docker (recommended)
+
+This project now builds a production artifact and serves it via `nginx` inside the container.
+
+From the repo root (`automation-lab`) you can bring up the backend and all frontends with Docker Compose:
+
+```bash
+docker compose up --build -d
+```
+
+If you only want the Angular frontend and the backend:
+
+```bash
+docker compose up --build -d backend angular
+```
+
+Notes:
+- The Angular container now serves the static app via `nginx` on container port `80`, mapped to host port `4200` by default.
+- The container reads the API base URL from the runtime environment variable `VITE_API_BASE_URL` and writes it to a small `env-config.js` file at container startup. The app reads `window.__API_BASE__` at runtime.
+- Default value inside the compose file is `http://backend:8000` so the Angular UI talks to the backend service on the Docker network.
+
+If you prefer to run a development build with live reload, use the old workflow locally:
+
+```bash
+cd frontend-angular
+npm install
+npm start
+```
+
+
 
 ## Development server
 
