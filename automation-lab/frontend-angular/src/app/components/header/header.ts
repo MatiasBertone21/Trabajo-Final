@@ -1,7 +1,9 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { authService } from '../../core/auth.service';
+import { cartService } from '../../services/cart.service';
 
 @Component({
   standalone: true,
@@ -15,7 +17,7 @@ import { authService } from '../../core/auth.service';
         </a>
         <nav class="header-nav" aria-label="Secondary navigation">
           <a routerLink="/products" [attr.data-testid]="'header-products'">Productos</a>
-          <a routerLink="/cart" [attr.data-testid]="'sidebar-cart'">Carrito</a>
+          <a routerLink="/cart" [attr.data-testid]="'sidebar-cart'">Carrito ({{ cartCount() }})</a>
           <a *ngIf="!isAuth()" routerLink="/login" [attr.data-testid]="'header-login'">Ingresar</a>
           <button *ngIf="isAuth()" class="ghost" (click)="logout()" [attr.data-testid]="'header-logout'">Salir</button>
         </nav>
@@ -88,7 +90,30 @@ import { authService } from '../../core/auth.service';
       }
     `],
 })
-export class Header {
+export class Header implements OnInit, OnDestroy {
+  cartCount = signal(0);
+  private cartSubscription?: Subscription;
+
+  async ngOnInit() {
+    await this.refreshCartCount();
+    this.cartSubscription = cartService.cartChanges.subscribe(() => {
+      void this.refreshCartCount();
+    });
+  }
+
+  ngOnDestroy() {
+    this.cartSubscription?.unsubscribe();
+  }
+
+  private async refreshCartCount() {
+    try {
+      const cart = await cartService.getCart();
+      this.cartCount.set(cart?.totalItems ?? 0);
+    } catch {
+      this.cartCount.set(0);
+    }
+  }
+
   isAuth() { return authService.isAuthenticated(); }
 
   logout() { authService.logout(); }

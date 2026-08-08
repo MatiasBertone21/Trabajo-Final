@@ -26,7 +26,16 @@ import { RouterLink } from '@angular/router';
           </div>
         </a>
         <div class="actions">
-          <button class="add" (click)="addToCart($event)" [attr.data-testid]="'catalog-add-' + product?.id">Agregar</button>
+          <div
+            class="add"
+            role="button"
+            tabindex="0"
+            (click)="addToCart($event)"
+            (keydown.enter)="addToCart($event)"
+            (keydown.space)="addToCart($event); $event.preventDefault()"
+          >
+            Agregar
+          </div>
         </div>
       </div>
     </article>
