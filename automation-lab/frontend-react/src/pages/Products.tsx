@@ -31,8 +31,8 @@ export const Products = () => {
     fetchData();
   }, []);
 
-    if (loading) return <div data-testid="loading-state">Cargando productos...</div>;
-    if (error) return <div data-testid="error-state">Error al cargar el catálogo.</div>;
+    if (loading) return <div>Cargando productos...</div>;
+    if (error) return <div>Error al cargar el catálogo.</div>;
 
     const filtered = products.filter(p => 
         (selectedCategory === 'All' || p.category === selectedCategory) &&
@@ -40,13 +40,12 @@ export const Products = () => {
     );
 
   return (
-    <div data-testid="products-page" className="page-shell">
+    <div className="page-shell">
       <div className="filters-row">
         <div className="input-group">
           <label htmlFor="search-input">Buscar</label>
           <input
             id="search-input"
-            data-testid="search-input"
             placeholder="Buscar..."
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -56,7 +55,6 @@ export const Products = () => {
           <label htmlFor="category-filter">Categoría</label>
           <select
             id="category-filter"
-            data-testid="category-filter"
             onChange={(e) => setSelectedCategory(e.target.value)}
           >
             {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
@@ -69,7 +67,7 @@ export const Products = () => {
           {filtered.map(p => <ProductCard key={p.id} product={p} />)}
         </div>
       ) : (
-        <div className="empty-state" data-testid="empty-products">No hay productos.</div>
+        <div className="empty-state">No hay productos.</div>
       )}
     </div>
   );

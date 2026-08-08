@@ -14,16 +14,15 @@ export const ProductCard = ({ product }: { product: Product }) => {
     };
 
   return (
-    <div data-testid="product-card" className="product-card">
+    <div className="product-card">
       <img
         src={getImageUrl((product as any).image)}
         alt={product.name}
         style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: '12px' }}
-        data-testid="product-image"
       />
 
       <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.75rem', alignItems: 'baseline' }}>
-        <h3 data-testid="product-name">{product.name}</h3>
+        <h3>{product.name}</h3>
         <span className="product-price">${product.price}</span>
       </div>
 
@@ -31,7 +30,7 @@ export const ProductCard = ({ product }: { product: Product }) => {
       <p style={{ color: 'var(--muted)', marginTop: '0.25rem' }}>Stock: {product.stock}</p>
 
       <div style={{ marginTop: 'auto' }}>
-        <button type="button" onClick={handleAddToCart} data-testid="add-to-cart-button" className="button-primary">
+        <button type="button" onClick={handleAddToCart} className="button-primary">
           Agregar al carrito
         </button>
       </div>
