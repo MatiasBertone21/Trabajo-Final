@@ -1,5 +1,5 @@
 # =========================
-# Dependencias de Node (Frontends)
+# Node.js Dependencies (Frontend)
 # =========================
 node_modules/
 dist/
@@ -7,7 +7,7 @@ build/
 .npm/
 
 # =========================
-# Dependencias de Python (Backend)
+# Python Dependencies (Backend)
 # =========================
 __pycache__/
 *.py[cod]
@@ -17,15 +17,16 @@ env/
 .pytest_cache/
 
 # =========================
-# Variables de Entorno
+# Environment Variables and Virtual Environments
 # =========================
 .env
 .env.*
 !.env.example
 venv
+.venv
 
 # =========================
-# Archivos del Sistema y Editores (IDEs)
+# System and Editor Files (IDEs)
 # =========================
 .DS_Store
 Thumbs.db
@@ -36,6 +37,14 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+.cursor
+.github/
+AGENTS.md
+
+# =========================
+# Report Files
+# =========================
+reports/
 
 # --- Docker ---
 backend/app/data/*.json

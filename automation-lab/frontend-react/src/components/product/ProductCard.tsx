@@ -7,7 +7,6 @@ export const ProductCard = ({ product }: { product: Product }) => {
       try {
         await cartService.addItem(product.id, 1);
         window.dispatchEvent(new Event('cartUpdated'));
-        alert("Producto agregado al carrito");
       } catch {
         alert("Error al agregar producto");
       }

@@ -79,6 +79,19 @@ Accesos principales:
 - Frontend Angular: http://localhost:4200
 - Frontend Svelte: http://localhost:5173
 
+## Aislamiento de Carrito Por Frontend
+
+Para evitar que distintos frontends compartan el mismo carrito, la API ahora segmenta el carrito por scope usando el header `X-Cart-Scope`.
+
+- React envía `X-Cart-Scope: react`
+- Angular envía `X-Cart-Scope: angular`
+- Svelte mantiene carrito local en su store y no usa los endpoints de carrito del backend en el flujo actual
+
+Notas de compatibilidad:
+
+- Si `app/data/cart.json` está en formato legacy (lista única), el backend lo interpreta como scope `default`.
+- Los nuevos cambios persisten el carrito en formato por scope (objeto con una lista por entorno).
+
 ## Estructura del Proyecto
 
 - `backend`: API FastAPI, lógica de dominio, repositorios JSON y servicios.

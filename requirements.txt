@@ -1,3 +1,7 @@
 pytest
-pytest -bdd
+pytest-bdd
+pytest-html
+pytest-playwright
+playwright
 screenpy
+python-dotenv

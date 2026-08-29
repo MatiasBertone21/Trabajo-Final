@@ -4,10 +4,11 @@ export const apiClient = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
   headers: {
     'Content-Type': 'application/json',
+    'X-Cart-Scope': 'react',
   },
 });
 
-// Interceptor para manejo de errores global
+// Interceptor to log errors for debugging purposes
 apiClient.interceptors.response.use(
   (response) => response,
   (error) => {

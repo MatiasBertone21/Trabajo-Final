@@ -8,9 +8,13 @@ export const API_BASE = (typeof window !== 'undefined' && window.__API_BASE__) |
 
 export async function apiFetch(path: string, options?: RequestInit) {
   const url = API_BASE + path;
+  const headers = new Headers(options?.headers);
+  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  if (!headers.has('X-Cart-Scope')) headers.set('X-Cart-Scope', 'angular');
+
   const opts: RequestInit = {
-    headers: { 'Content-Type': 'application/json' },
     ...options,
+    headers,
   };
   const res = await fetch(url, opts);
   if (!res.ok) {

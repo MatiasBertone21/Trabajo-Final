@@ -118,6 +118,5 @@ export class CatalogItem {
     const { cartService } = await import('../../services/cart.service');
     if (!this.product) return;
     await cartService.addItem(this.product.id, 1);
-    alert('Añadido al carrito');
   }
 }
