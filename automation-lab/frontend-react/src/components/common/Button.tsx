@@ -2,7 +2,7 @@ interface ButtonProps {
   label: string;
   onClick?: () => void;
   type?: 'button' | 'submit' | 'reset';
-  testId: string; // para automatización
+  testId: string; 
   className?: string;
 }
 

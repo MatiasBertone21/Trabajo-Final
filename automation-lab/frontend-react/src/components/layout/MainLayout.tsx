@@ -10,7 +10,6 @@ export const MainLayout = () => {
   const fetchCartCount = async () => {
     try {
       const cart = await cartService.getCart();
-      // Sumamos la cantidad total de unidades de todos los productos en el carrito
       const totalItems = cart.items.reduce((acc, item) => acc + item.quantity, 0);
       setCartCount(totalItems);
     } catch {
@@ -20,7 +19,6 @@ export const MainLayout = () => {
 
   useEffect(() => {
     fetchCartCount();
-    // Opcional: un evento personalizado o intervalo corto si deseas sincronizar en tiempo real
     window.addEventListener('cartUpdated', fetchCartCount);
     return () => window.removeEventListener('cartUpdated', fetchCartCount);
   }, []);
