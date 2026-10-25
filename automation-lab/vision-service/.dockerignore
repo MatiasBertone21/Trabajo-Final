@@ -1,0 +1,26 @@
+# Python artifacts
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.mypy_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# VCS / IDE
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Generated outputs (not needed in the image)
+reports/
+
+# Docs / Docker files
+README.md
+Dockerfile
+.dockerignore

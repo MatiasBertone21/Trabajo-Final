@@ -9,6 +9,12 @@ services:
       - ./backend:/app
       - ./assets:/app/assets
     command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 10s
 
   react:
     build: 
@@ -48,3 +54,23 @@ services:
     volumes:
       - ./frontend-svelte:/app
       - /app/node_modules
+
+  vision-service:
+    build:
+      context: ./vision-service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    container_name: automation-lab-vision
+    volumes:
+      - ./vision-service:/app
+      - /app/__pycache__
+    environment:
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
