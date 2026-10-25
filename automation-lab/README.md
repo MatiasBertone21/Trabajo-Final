@@ -48,6 +48,7 @@ La funcionalidad es la misma en los tres frontends: al hacer click, se agrega el
 | react | 3000 | Frontend React |
 | angular | 4200 | Frontend Angular (Nginx en contenedor) |
 | svelte | 5173 | Frontend Svelte |
+| vision-service | 8001 | Detección visual de elementos UI (OpenCV + OCR). Ver `vision-service/README.md` |
 
 ## Requisitos Previos
 
@@ -100,3 +101,28 @@ Notas de compatibilidad:
 - `frontend-svelte`: implementación UI en Svelte.
 - `assets`: recursos compartidos usados por backend y frontends.
 
+
+## Servicio vision y Docker Compose
+
+El servicio `vision-service` (puerto 8001) se construye con `docker compose up -d --build`. Detalle del build y decisiones: ver [`vision-service/README.md`](vision-service/README.md#docker-build-optimizado).
+
+### Healthchecks
+
+`backend` (`/health`, puerto 8000) y `vision-service` (`/health`, puerto 8001) tienen healthcheck propio y pueden levantarse de forma independiente.
+
+```bash
+# Levanta y bloquea hasta que los servicios con healthcheck estén healthy
+docker compose up -d --wait
+docker compose ps
+```
+
+Útil para tests (p. ej. Playwright) en lugar de `sleep`.
+
+### Qué hace cada comando
+
+| Comando | Containers | Imágenes | Volúmenes |
+|---|---|---|---|
+| `docker compose stop` / `start` | se conservan | se conservan | se conservan |
+| `docker compose down` | se eliminan (y la red) | se conservan | los con nombre se conservan; los anónimos (`node_modules`, `__pycache__`) se eliminan |
+| `docker compose down -v` | se eliminan | se conservan | se eliminan |
+| `docker compose down --rmi all` | se eliminan | se eliminan (rebuild lento) | se conservan |
