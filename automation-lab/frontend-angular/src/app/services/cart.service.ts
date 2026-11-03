@@ -19,11 +19,8 @@ export class CartService {
   }
 
   async updateItem(productId: number, quantity: number): Promise<CartResponse> {
-    const result = await apiFetch(`/cart/items/${productId}`, {
+    const result = await apiFetch(`/cart/items/${productId}?quantity=${quantity}`, {
       method: 'PUT',
-      // backend expects quantity as query param based on implementation
-      // but cart_endpoints.update_item signature is (productId, quantity: int) so passing body
-      body: JSON.stringify({ quantity }),
     });
     this.cartChanges.next();
     return result;

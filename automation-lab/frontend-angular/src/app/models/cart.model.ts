@@ -1,6 +1,8 @@
 export interface CartItem {
   productId: number;
   productName: string;
+  description?: string;
+  image?: string;
   quantity: number;
   unitPrice: number;
   subtotal: number;
