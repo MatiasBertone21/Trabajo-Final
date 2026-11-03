@@ -8,6 +8,8 @@ class CartItemAdd(BaseModel):
 class CartItem(BaseModel):
     productId: int
     productName: str
+    description: str | None = None
+    image: str | None = None
     quantity: int
     unitPrice: float
     subtotal: float

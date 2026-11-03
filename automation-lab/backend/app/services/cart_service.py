@@ -45,6 +45,14 @@ def get_cart(scope: str | None = None) -> dict:
     scope_key = _normalize_scope(scope)
     scoped_carts = _read_scoped_carts()
     items = _get_scope_items(scoped_carts, scope_key)
+    products_by_id = {p["id"]: p for p in product_repo.read_all()}
+    for item in items:
+        product = products_by_id.get(item.get("productId"))
+        if product:
+            if not item.get("image"):
+                item["image"] = product.get("image")
+            if not item.get("description"):
+                item["description"] = product.get("description")
     total_items = sum(item["quantity"] for item in items)
     total_amount = sum(item["subtotal"] for item in items)
     return {"items": items, "totalItems": total_items, "totalAmount": total_amount}
@@ -72,10 +80,14 @@ def add_to_cart(product_id: int, quantity: int, scope: str | None = None):
     if existing_item:
         existing_item["quantity"] += quantity
         existing_item["subtotal"] = existing_item["quantity"] * existing_item["unitPrice"]
+        existing_item["description"] = product.get("description")
+        existing_item["image"] = product.get("image")
     else:
         cart.append({
             "productId": product["id"],
             "productName": product["name"],
+            "description": product.get("description"),
+            "image": product.get("image"),
             "quantity": quantity,
             "unitPrice": product["price"],
             "subtotal": product["price"] * quantity

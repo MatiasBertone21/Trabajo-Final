@@ -52,7 +52,7 @@ export const Cart = () => {
   const handleClear = async () => {
     try {
       await cartService.clearCart();
-      setCart({ items: [], total: 0 });
+      setCart({ items: [], total: 0, totalAmount: 0, totalItems: 0 });
       notifyCartChange();
     } catch {
       alert("Error al vaciar el carrito");
@@ -62,6 +62,12 @@ export const Cart = () => {
   if (loading) return <div data-testid="loading-state" className="status-message">Cargando carrito...</div>;
   if (error) return <div data-testid="error-state" className="status-message">Error al cargar el carrito.</div>;
   if (!cart || cart.items.length === 0) return <div data-testid="empty-cart" className="empty-state">Tu carrito está vacío.</div>;
+
+  const computedTotal =
+    cart.totalAmount ??
+    (cart.total && cart.total > 0
+      ? cart.total
+      : cart.items.reduce((acc, i) => acc + (i.subtotal ?? ((i.unitPrice ?? i.price ?? 0) * i.quantity)), 0));
 
   return (
     <div data-testid="cart-page" className="cart-page">
@@ -75,17 +81,24 @@ export const Cart = () => {
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         {cart.items.map((item) => {
-            const itemSubtotal = item.subtotal ?? (item.price * item.quantity);
+          const itemName = item.productName ?? item.name ?? '';
+          const itemPrice = item.unitPrice ?? item.price ?? 0;
+          const itemSubtotal = item.subtotal ?? (itemPrice * item.quantity);
 
           return (
             <div key={item.productId} data-testid="cart-item" className="cart-item">
-              <img src={getImageUrl(item.image)} alt={item.name} />
+              <img src={getImageUrl(item.image)} alt={itemName} />
 
               <div className="cart-item-details">
                 <div className="cart-item-header">
                   <div>
-                    <h4 data-testid="cart-item-name">{item.name}</h4>
-                    <p style={{ color: 'var(--muted)' }}>Precio: ${item.price}</p>
+                    <h4 data-testid="cart-item-name">{itemName}</h4>
+                    {item.description && (
+                      <p className="page-copy" data-testid="cart-item-description" style={{ margin: '0.2rem 0 0.35rem' }}>
+                        {item.description}
+                      </p>
+                    )}
+                    <p style={{ color: 'var(--muted)' }}>Precio: ${itemPrice}</p>
                   </div>
                   <span style={{ fontWeight: 700, color: 'var(--text-h)' }}>Subtotal: <span data-testid="cart-item-subtotal">${itemSubtotal}</span></span>
                 </div>
@@ -105,7 +118,7 @@ export const Cart = () => {
       </div>
 
       <div className="cart-summary">
-        Total: $<span data-testid="cart-total">{cart.total > 0 ? cart.total : cart.items.reduce((acc, i) => acc + (i.subtotal ?? (i.price * i.quantity)), 0)}</span>
+        Total: $<span data-testid="cart-total">{computedTotal}</span>
       </div>
     </div>
   );
