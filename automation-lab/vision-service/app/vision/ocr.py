@@ -98,7 +98,14 @@ def extract_text_easyocr(roi: np.ndarray, reader=None) -> Tuple[str, float]:
         if reader is None:
             reader = get_easyocr_reader()
 
-        results = reader.readtext(roi)
+        # Upscale small UI button ROIs (<120px height) 2x and lower min_size from 20 -> 8
+        # so isolated single digits (e.g. 'Carrito ( 1 )' or badge counters 'Cart 0') are not discarded.
+        ocr_input = (
+            cv2.resize(roi, None, fx=2.0, fy=2.0, interpolation=cv2.INTER_CUBIC)
+            if roi.shape[0] < 120
+            else roi
+        )
+        results = reader.readtext(ocr_input, min_size=8, width_ths=0.9)
 
         if not results:
             return "", 0.0

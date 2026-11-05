@@ -1,4 +1,5 @@
 import logging
+import time
 from typing import List, Optional
 import cv2
 import numpy as np
@@ -114,12 +115,16 @@ async def detect(
         top_k: return top k candidates
 
     Returns:
-        JSON payload with detected ElementCandidate list
+        JSON payload with detected ElementCandidate list and layer timings_ms
     """
     try:
+        t_total_start = time.perf_counter()
+
+        t_dec_start = time.perf_counter()
         content = await file.read()
         image_array = np.frombuffer(content, dtype=np.uint8)
         image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
+        decode_ms = (time.perf_counter() - t_dec_start) * 1000.0
 
         if image is None:
             return JSONResponse(
@@ -136,7 +141,9 @@ async def detect(
             visual_threshold=visual_threshold,
         )
 
+        ranking_ms = 0.0
         if enable_ocr and target_description:
+            t_rank_start = time.perf_counter()
             parsed_synonyms = _parse_csv_query(synonyms)
 
             candidates = rank_by_description(
@@ -147,12 +154,28 @@ async def detect(
                 top_k=top_k,
                 confidence_threshold=VisionConfig.RANKING_MIN_RELEVANCE,
             )
+            ranking_ms = (time.perf_counter() - t_rank_start) * 1000.0
         elif top_k is not None:
             candidates = candidates[:top_k]
+
+        total_server_ms = (time.perf_counter() - t_total_start) * 1000.0
+        engine_timings = getattr(engine, "last_timings_ms", {}) or {}
+
+        timings_ms = {
+            "decode_ms": round(decode_ms, 2),
+            "preprocess_ms": engine_timings.get("preprocess_ms", 0.0),
+            "template_ms": engine_timings.get("template_ms", 0.0),
+            "contour_ms": engine_timings.get("contour_ms", 0.0),
+            "ocr_ms": engine_timings.get("ocr_ms", 0.0),
+            "nms_ms": engine_timings.get("nms_ms", 0.0),
+            "ranking_ms": round(ranking_ms, 2),
+            "total_server_ms": round(total_server_ms, 2),
+        }
 
         result = {
             "status": "success",
             "candidates_count": len(candidates),
+            "timings_ms": timings_ms,
             "candidates": [c.to_dict() for c in candidates],
         }
 
