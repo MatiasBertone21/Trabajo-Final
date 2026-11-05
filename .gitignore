@@ -40,11 +40,28 @@ Thumbs.db
 .cursor
 .github/
 AGENTS.md
+graphify-out/
+thesis-docs/
+
 
 # =========================
-# Report Files
+# Report Files, Logs, and Generated Templates
 # =========================
 reports/
+**/reports/
+*.log
+**/*.log
+openvisor-inputs/
+**/openvisor-inputs/
+**/openvisor/inputs/
+metrics-history/
+**/metrics-history/
+test-results/
+**/test-results/
+templates/
+**/templates/
+automation-playwright/templates/
+
 
 # --- Docker ---
 backend/app/data/*.json

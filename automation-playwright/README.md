@@ -29,6 +29,15 @@ pip install -r requirements.txt
 playwright install chromium
 ```
 
+### Generación de Plantillas Visuales (`templates/`)
+
+Para ejecutar los tests basados en **Percepción Visual (`opencv` y `opencv_full`)**, primero se debe correr el recolector automatizado de plantillas (`utils/harvest_templates.py`) con los contenedores de `automation-lab` levantados. Este script navega automáticamente por los 3 frontends (`react`, `angular`, `svelte`) y genera las capturas 1:1 en `automation-playwright/templates/` (directorio ignorado en Git):
+
+```bash
+cd automation-playwright
+python utils/harvest_templates.py --env all
+```
+
 ---
 
 ## Ejecución de Tests
@@ -40,6 +49,10 @@ Todos los comandos se ejecutan desde `automation-playwright/` con el venv activo
 pytest --env=react
 pytest --env=angular
 pytest --env=svelte
+
+# Flujos E2E comparativos 1:1 (Full GetBy vs Full Vision)
+pytest tests/test_full_getby_flow.py --env=react -v
+pytest tests/test_full_vision_flow.py --env=react -v
 
 # Solo smoke tests
 pytest --env=react -m smoke
@@ -75,17 +88,22 @@ automation-playwright/
 ├── conftest.py          # Fixtures de sesión: browser, page, base_url, selectors, auth_page
 ├── pytest.ini           # testpaths, definición de markers, addopts por defecto
 ├── pages/
-│   ├── base_page.py     # BasePage: navigate(), get_title(), timeout compartido
+│   ├── base_page.py     # BasePage: navigate(), get_title(), helpers visuales y get_by
 │   ├── login_page.py    # LoginPage: fill_credentials(), submit(), is_redirected_to_home()
 │   ├── home_page.py     # HomePage: is_loaded(), go_to_products()
-│   ├── products_page.py # ProductsPage: get_product_cards(), add_to_cart()
-│   └── cart_page.py     # CartPage: get_items(), remove_item(), clear_cart(), is_empty()
+│   ├── products_page.py # ProductsPage: get_product_cards(), add_to_cart(), auditorías E2E
+│   └── cart_page.py     # CartPage: get_items(), remove_item(), auditorías E2E de carrito
 ├── tests/
-│   ├── test_login.py    # Login exitoso, credenciales inválidas, guard de redirección
-│   ├── test_products.py # Lista de productos, navegación desde home, flujo add-to-cart
-│   └── test_cart.py     # Item en carrito, quitar item, vaciar carrito
+│   ├── test_login.py            # Login exitoso, credenciales inválidas, guard de redirección
+│   ├── test_products.py         # Flujo add-to-cart con estrategias base, getby y opencv
+│   ├── test_full_getby_flow.py  # Flujo E2E completo de 5 etapas con selectores semánticos (getby_full)
+│   ├── test_full_vision_flow.py # Flujo E2E completo de 5 etapas con visión artificial (opencv_full)
+│   └── test_cart.py             # Item en carrito, quitar item, vaciar carrito
 └── utils/
-    └── selectors.py     # Mapas de locators por frontend, indexados por nombre de env
+    ├── harvest_templates.py     # Generador automatizado de plantillas UI 1:1 en templates/<env>/
+    ├── openvisor_helper.py      # Cliente de vision-service y renderizado de auditoría visual
+    ├── telemetry.py             # Recolector de métricas por paso y por test en JSONL
+    └── selectors.py             # Mapas de locators por frontend, indexados por nombre de env
 ```
 
 ---
@@ -146,23 +164,8 @@ function scope
 
 ## Reports
 
-- El proyecto genera reportes HTML y JUnit XML automáticamente usando `pytest-html` y la opción `--html`/`--self-contained-html` (configurada en `pytest.ini`).
-- Las capturas de pantalla de fallos se adjuntan al reporte HTML mediante el hook `pytest_runtest_makereport` (ver `conftest.py`). Cuando una prueba falla, se toma `page.screenshot(full_page=True)` y se incrusta en el HTML.
-- Comandos útiles:
-
-```bash
-# Ejecuta la suite y genera un reporte HTML autocontenido y JUnit XML
-pytest --env=react
-
-# Forzar ruta de salida del reporte (sobrescribe la opción de pytest.ini)
-pytest --env=react --html=reports/report.html --self-contained-html
-```
-
-- Archivos generados (por defecto, según `pytest.ini`):
-  - `reports/report.html` — reporte HTML con capturas embebidas.
-  - `reports/report.xml` — JUnit XML para integraciones CI.
-
-- Nota: `pytest-html` ya está listado en `requirements.txt`. Asegúrate de crear la carpeta `reports/` si tu entorno CI no la crea automáticamente.
+- El proyecto genera reportes JUnit XML (`reports/report.xml`) enriquecidos con propiedades y adjuntos visuales (`junit-attachments`) y telemetría estructurada en JSONL (`step_metrics.jsonl` y `test_summary.jsonl`).
+- Las capturas de pantalla de fallos y las escenas anotadas con *Bounding Boxes* de los flujos visuales (`opencv` y `opencv_full`) se guardan en `reports/<strategy>/<env>/vision_audit/` y `reports/screenshots/`.
 
 ---
 
@@ -172,7 +175,6 @@ pytest --env=react --html=reports/report.html --self-contained-html
 - **Angular add-to-cart** usa un `div[role=button]` en lugar de `<button>` — sin `data-testid`; el selector apunta a `.catalog-card .add`.
 - **Svelte** no tiene atributos `data-testid` — los selectores se basan en HTML semántico y clases CSS.
 - **Svelte clear cart** no existe en la UI — `test_clear_cart` se auto-omite con `--env=svelte`.
-- El estado del carrito **no se resetea entre tests**. Para aislamiento total, agregar un fixture de teardown que llame a `DELETE /api/cart` en el backend.
 
 ---
 
