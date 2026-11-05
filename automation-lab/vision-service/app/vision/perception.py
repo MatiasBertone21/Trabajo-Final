@@ -2,6 +2,7 @@
 PerceptionEngine: Main orchestrator for vision-based UI element detection.
 Combines template matching, contour detection, and OCR.
 """
+import time
 from typing import List, Dict, Optional
 import cv2
 import numpy as np
@@ -138,6 +139,7 @@ class PerceptionEngine:
     def __init__(self, config: Optional[VisionConfig] = None):
         self.config = config or VisionConfig()
         self.templates: Dict[str, np.ndarray] = {}
+        self.last_timings_ms: Dict[str, float] = {}
 
     def register_template(self, template_id: str, template_image: np.ndarray) -> None:
         """Register a template for template matching."""
@@ -196,22 +198,33 @@ class PerceptionEngine:
         if strategies is None:
             strategies = ["template"]
 
+        t_pre_start = time.perf_counter()
         processed_image = self.preprocess_image(image)
+        preprocess_ms = (time.perf_counter() - t_pre_start) * 1000.0
+
         h, w = processed_image.shape[:2]
         image_area = h * w
 
         raw_candidates = []
+        template_ms = 0.0
+        contour_ms = 0.0
+        ocr_ms = 0.0
 
         # Template Matching strategy
         if "template" in strategies and self.templates:
+            t_tpl_start = time.perf_counter()
             template_matches = match_multiple_templates(
                 processed_image, self.templates, threshold=visual_threshold
             )
+            template_ms += (time.perf_counter() - t_tpl_start) * 1000.0
+
             for match in template_matches:
                 area_ratio = (match["width"] * match["height"]) / image_area
 
                 if enable_ocr:
+                    t_ocr_start = time.perf_counter()
                     text, ocr_conf = extract_text_from_roi(image, match)
+                    ocr_ms += (time.perf_counter() - t_ocr_start) * 1000.0
                     ocr_details = {
                         "engine": self.config.OCR_ENGINE,
                         "text": text if text else "",
@@ -246,12 +259,17 @@ class PerceptionEngine:
 
         # Contour Detection strategy
         if "contour" in strategies:
+            t_cnt_start = time.perf_counter()
             contours = detect_ui_elements(processed_image)
+            contour_ms += (time.perf_counter() - t_cnt_start) * 1000.0
+
             for contour in contours:
                 area_ratio = (contour["width"] * contour["height"]) / image_area
 
                 if enable_ocr:
+                    t_ocr_start = time.perf_counter()
                     text, ocr_conf = extract_text_from_roi(image, contour)
+                    ocr_ms += (time.perf_counter() - t_ocr_start) * 1000.0
                     ocr_details = {
                         "engine": self.config.OCR_ENGINE,
                         "text": text if text else "",
@@ -284,6 +302,7 @@ class PerceptionEngine:
                     "ocr_details": ocr_details,
                 })
 
+        t_nms_start = time.perf_counter()
         filtered = apply_nms(raw_candidates)
         filtered = [c for c in filtered if c["confidence"] >= self.config.CONFIDENCE_MIN_THRESHOLD]
 
@@ -306,5 +325,14 @@ class PerceptionEngine:
                 ocr_details=candidate.get("ocr_details"),
             )
             candidates.append(element_candidate)
+        nms_ms = (time.perf_counter() - t_nms_start) * 1000.0
+
+        self.last_timings_ms = {
+            "preprocess_ms": round(preprocess_ms, 2),
+            "template_ms": round(template_ms, 2),
+            "contour_ms": round(contour_ms, 2),
+            "ocr_ms": round(ocr_ms, 2),
+            "nms_ms": round(nms_ms, 2),
+        }
 
         return candidates
