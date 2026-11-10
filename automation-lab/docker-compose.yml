@@ -29,6 +29,12 @@ services:
     volumes:
       - ./frontend-react:/app
       - /app/node_modules
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:3000"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 20s
 
   angular:
     build: 
@@ -40,6 +46,12 @@ services:
       - backend
     environment:
       VITE_API_BASE_URL: http://localhost:8000
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:80"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 20s
 
   svelte:
     build: 
@@ -54,6 +66,12 @@ services:
     volumes:
       - ./frontend-svelte:/app
       - /app/node_modules
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://127.0.0.1:5173"]
+      interval: 5s
+      timeout: 3s
+      retries: 24
+      start_period: 20s
 
   vision-service:
     build:
@@ -74,3 +92,57 @@ services:
       timeout: 3s
       retries: 12
       start_period: 20s
+
+  jenkins:
+    build:
+      context: ./jenkins/controller
+    container_name: automation-lab-jenkins
+    ports:
+      - "8088:8080"
+    environment:
+      JENKINS_ADMIN_ID: ${JENKINS_ADMIN_ID:-admin}
+      JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD:-admin123}
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - ./jenkins/casc:/var/jenkins_casc:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8080/login"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 40s
+
+  pw-agent:
+    profiles: ["linux-agent"]
+    build:
+      context: ..
+      dockerfile: automation-lab/jenkins/agent/Dockerfile
+    container_name: automation-lab-pw-agent
+    environment:
+      JENKINS_URL: http://jenkins:8080
+      JENKINS_AGENT_NAME: pw-agent
+      JENKINS_ADMIN_ID: ${JENKINS_ADMIN_ID:-admin}
+      JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD:-admin123}
+    volumes:
+      - ../automation-playwright:/workspace/automation-playwright
+      - pw_agent_home:/home/jenkins/agent
+    shm_size: 1gb
+    restart: unless-stopped
+    depends_on:
+      jenkins:
+        condition: service_healthy
+      backend:
+        condition: service_healthy
+      vision-service:
+        condition: service_healthy
+      react:
+        condition: service_healthy
+      angular:
+        condition: service_healthy
+      svelte:
+        condition: service_healthy
+
+volumes:
+  jenkins_home:
+  pw_agent_home:
