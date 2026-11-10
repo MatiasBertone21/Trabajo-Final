@@ -1,16 +1,16 @@
 """
-Script: Harvest Templates (Generador Automatizado de Plantillas UI)
+Script: Harvest Templates (Automated UI Template Harvester)
 
-Propósito:
-    Navegar automáticamente a través de los entornos de Automation Lab (React, Svelte, Angular),
-    localizar los elementos de interfaz usando los selectores probados del framework,
-    y capturar recortes de subpíxel 1:1 guardándolos organizados por entorno en templates/{env}/.
+Purpose:
+    Automatically navigate across the Automation Lab frontends (React, Svelte, Angular),
+    locate UI elements using the framework's verified selectors, and capture 1:1 subpixel
+    crops organized by environment under templates/{env}/.
 
-    Además, permite descomponer:
-      - Una tarjeta de producto (e.g. basketball) en templates/{env}/product-card/
-      - Un ítem del carrito (e.g. basketball) en templates/{env}/cart-item/
+    Additionally decomposes:
+      - A product card (e.g., basketball) into templates/{env}/product-card/
+      - A cart item (e.g., basketball) into templates/{env}/cart-item/
 
-Uso:
+Usage:
     python utils/harvest_templates.py --env all
     python utils/harvest_templates.py --env svelte --product basketball
     python utils/harvest_templates.py --env react --product basketball --headed
@@ -18,18 +18,24 @@ Uso:
 
 import os
 import sys
+import platform
 import argparse
 from pathlib import Path
+
+# Prevent utils/selectors.py from shadowing Python's stdlib 'selectors' module
+# when running 'python utils/harvest_templates.py' directly.
+SCRIPT_DIR = str(Path(__file__).resolve().parent)
+PLAYWRIGHT_ROOT = Path(__file__).resolve().parent.parent
+if SCRIPT_DIR in sys.path:
+    sys.path.remove(SCRIPT_DIR)
+if str(PLAYWRIGHT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PLAYWRIGHT_ROOT))
+
 from dotenv import load_dotenv
 from playwright.sync_api import sync_playwright, Page, Locator
-
-# Agregar la raíz de automation-playwright al path de importación
-PLAYWRIGHT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PLAYWRIGHT_ROOT))
-
 from utils.selectors import SELECTORS
 
-# Cargar variables de entorno
+# Load environment variables
 load_dotenv(PLAYWRIGHT_ROOT / ".env")
 
 ENV_URLS = {
@@ -41,7 +47,7 @@ ENV_URLS = {
 USER_EMAIL = os.getenv("USER_EMAIL", "admin@test.com")
 USER_PASSWORD = os.getenv("USER_PASSWORD", "admin123")
 
-# Catálogo declarativo de elementos globales a capturar por página
+# Declarative catalog of global UI elements to capture per page
 HARVEST_PLAN = {
     "login": {
         "url": "/login",
@@ -71,37 +77,37 @@ HARVEST_PLAN = {
 
 
 def _capture_locator(locator: Locator, output_path: Path, label: str):
-    """Espera que el locator relativo sea visible y toma su captura 1:1."""
+    """Wait for the relative locator to become visible and capture a 1:1 screenshot."""
     try:
         locator.wait_for(state="visible", timeout=3000)
         locator.screenshot(path=str(output_path), animations="disabled")
         print(f"    [SUBCOMPONENT OK] {label} -> {output_path.name}")
     except Exception as e:
-        print(f"    [SUBCOMPONENT SKIP] No se pudo capturar {label} ({output_path.name}): {e}")
+        print(f"    [SUBCOMPONENT SKIP] Could not capture {label} ({output_path.name}): {e}")
 
 
 def _capture_element(page: Page, selector: str, output_path: Path, label: str):
-    """Espera que el selector en página sea visible y toma su captura 1:1."""
+    """Wait for the page selector to become visible and capture a 1:1 screenshot."""
     try:
         locator = page.locator(selector).first
         locator.wait_for(state="visible", timeout=4000)
         locator.screenshot(path=str(output_path), animations="disabled")
-        print(f"  [CAPTURA OK] {label} -> {output_path.name}")
+        print(f"  [CAPTURE OK] {label} -> {output_path.name}")
     except Exception as e:
-        print(f"  [OMITIDO] No se pudo capturar '{selector}' ({label}): {e}")
+        print(f"  [SKIPPED] Could not capture '{selector}' ({label}): {e}")
 
 
 def _harvest_product_card(page: Page, env_name: str, base_output_dir: Path, product_filter: str) -> Locator | None:
     """
-    Localiza la tarjeta del producto especificado por product_filter (ej: 'basketball')
-    y captura atómicamente cada uno de sus subcomponentes dentro de:
+    Locate the product card matching product_filter (e.g., 'basketball')
+    and atomically capture each of its subcomponents into:
         templates/{env}/product-card/
-    Devuelve el locator de la tarjeta encontrada para poder agregarla al carrito.
+    Returns the found card locator so it can subsequently be added to the cart.
     """
     card_output_dir = base_output_dir / "product-card"
     card_output_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"\n  [Product Card] Descomponiendo tarjeta de '{product_filter}' en {env_name}...")
+    print(f"\n  [Product Card] Decomposing card for '{product_filter}' in {env_name}...")
 
     container_selectors = {
         "svelte": "article.product-card",
@@ -110,62 +116,62 @@ def _harvest_product_card(page: Page, env_name: str, base_output_dir: Path, prod
     }
     card_sel = container_selectors.get(env_name, ".product-card, .catalog-card, article")
 
-    # Localizar todas las tarjetas y filtrar por el nombre/texto del producto (insensible a mayúsculas)
+    # Locate all cards and filter by product name/text (case-insensitive)
     cards = page.locator(card_sel)
     target_card = cards.filter(has_text=product_filter).first
 
     try:
         target_card.wait_for(state="visible", timeout=5000)
     except Exception as e:
-        print(f"  [WARN] No se encontró tarjeta visible con texto '{product_filter}' en {env_name}: {e}")
+        print(f"  [WARN] Could not find visible card with text '{product_filter}' in {env_name}: {e}")
         return None
 
-    # 1. Contenedor completo de la tarjeta
-    _capture_locator(target_card, card_output_dir / "product-card-container.png", f"{env_name}: Tarjeta Completa")
+    # 1. Full product card container
+    _capture_locator(target_card, card_output_dir / "product-card-container.png", f"{env_name}: Full Card")
 
-    # 2. Subcomponentes internos (relativos a target_card)
+    # 2. Inner subcomponents (relative to target_card)
     subcomponents = [
-        ("img", "product-card-image.png", "Imagen"),
-        ("h2, h3, .product-title", "product-card-title.png", "Título"),
-        (".category, p.category, span.category, p:not(:has-text('Stock'))", "product-card-category.png", "Categoría"),
-        ("strong, .price, .product-price", "product-card-price.png", "Precio"),
-        (".detail-link, a:has-text('View details'), a:has-text('Detalles')", "product-card-view-details-btn.png", "Botón Detalles"),
-        ("button, .add, .button-primary, [role='button'].add", "product-card-add-to-bag-btn.png", "Botón Agregar"),
+        ("img", "product-card-image.png", "Image"),
+        ("h2, h3, .product-title", "product-card-title.png", "Title"),
+        (".category, p.category, span.category, p:not(:has-text('Stock'))", "product-card-category.png", "Category"),
+        ("strong, .price, .product-price", "product-card-price.png", "Price"),
+        (".detail-link, a:has-text('View details'), a:has-text('Detalles')", "product-card-view-details-btn.png", "Details Button"),
+        ("button, .add, .button-primary, [role='button'].add", "product-card-add-to-bag-btn.png", "Add Button"),
     ]
 
-    # Subcomponente específico de descripción (e.g. Svelte)
+    # Environment-specific description subcomponent (e.g., Svelte)
     if env_name == "svelte":
-        subcomponents.append((".product-body p:not(.category)", "product-card-description.png", "Descripción"))
+        subcomponents.append((".product-body p:not(.category)", "product-card-description.png", "Description"))
 
     for sub_sel, filename, label in subcomponents:
         loc = target_card.locator(sub_sel).first
         _capture_locator(loc, card_output_dir / filename, f"{env_name}: {label}")
 
-    # 3. Capturar también el contenedor completo de 'Laptop Pro' para resolución espacial jerárquica (BBox padre-hijo)
+    # 3. Also capture the full 'Laptop Pro' card container for hierarchical spatial resolution (parent-child BBox)
     laptop_card = cards.filter(has_text="Laptop").first
     try:
         laptop_card.wait_for(state="visible", timeout=3000)
         _capture_locator(
             laptop_card,
             card_output_dir / "laptop-card-container.png",
-            f"{env_name}: Tarjeta Completa (Laptop Pro)",
+            f"{env_name}: Full Card (Laptop Pro)",
         )
     except Exception as e:
-        print(f"  [WARN] No se pudo capturar 'laptop-card-container.png' en {env_name}: {e}")
+        print(f"  [WARN] Could not capture 'laptop-card-container.png' in {env_name}: {e}")
 
     return target_card
 
 
 def _harvest_cart_item(page: Page, env_name: str, base_output_dir: Path, product_filter: str):
     """
-    Localiza la fila del carrito para el producto especificado (ej: 'basketball')
-    y captura sus subcomponentes dentro de:
+    Locate the cart row for the specified product (e.g., 'basketball')
+    and capture its subcomponents into:
         templates/{env}/cart-item/
     """
     cart_item_dir = base_output_dir / "cart-item"
     cart_item_dir.mkdir(parents=True, exist_ok=True)
 
-    print(f"\n  [Cart Item] Descomponiendo fila de carrito de '{product_filter}' en {env_name}...")
+    print(f"\n  [Cart Item] Decomposing cart row for '{product_filter}' in {env_name}...")
 
     row_selectors = {
         "react": "[data-testid='cart-item']",
@@ -180,36 +186,36 @@ def _harvest_cart_item(page: Page, env_name: str, base_output_dir: Path, product
     try:
         target_row.wait_for(state="visible", timeout=5000)
     except Exception as e:
-        print(f"  [WARN] No se encontró fila de carrito con texto '{product_filter}' en {env_name}: {e}")
+        print(f"  [WARN] Could not find cart row with text '{product_filter}' in {env_name}: {e}")
         return
 
-    # 1. Contenedor completo de la fila del carrito
-    _capture_locator(target_row, cart_item_dir / "cart-item-container.png", f"{env_name}: Cart Item Completo")
+    # 1. Full cart row container
+    _capture_locator(target_row, cart_item_dir / "cart-item-container.png", f"{env_name}: Full Cart Item")
 
-    # 2. Subcomponentes internos por entorno
+    # 2. Inner subcomponents per environment
     env_subcomponents = {
         "react": [
-            ("img", "cart-item-image.png", "Imagen Miniatura"),
-            ("[data-testid='cart-item-name']", "cart-item-title.png", "Título Producto"),
-            ("[data-testid='cart-item-description']", "cart-item-description.png", "Descripción Producto"),
-            ("[data-testid='decrease-quantity']", "cart-item-decrease-btn.png", "Botón Menos (-)"),
-            ("[data-testid='increase-quantity']", "cart-item-increase-btn.png", "Botón Más (+)"),
-            ("[data-testid='remove-item-button']", "cart-item-remove-btn.png", "Botón Eliminar"),
+            ("img", "cart-item-image.png", "Thumbnail Image"),
+            ("[data-testid='cart-item-name']", "cart-item-title.png", "Product Title"),
+            ("[data-testid='cart-item-description']", "cart-item-description.png", "Product Description"),
+            ("[data-testid='decrease-quantity']", "cart-item-decrease-btn.png", "Decrease Button (-)"),
+            ("[data-testid='increase-quantity']", "cart-item-increase-btn.png", "Increase Button (+)"),
+            ("[data-testid='remove-item-button']", "cart-item-remove-btn.png", "Remove Button"),
         ],
         "angular": [
-            ("img.cart-thumb, img", "cart-item-image.png", "Imagen Miniatura"),
-            (".cart-label", "cart-item-title.png", "Título Producto"),
-            (".item-details .cart-meta:first-of-type", "cart-item-description.png", "Descripción Producto"),
-            ("[data-testid^='cart-decrease-']", "cart-item-decrease-btn.png", "Botón Menos (-)"),
-            ("[data-testid^='cart-increase-']", "cart-item-increase-btn.png", "Botón Más (+)"),
-            ("button.remove, [data-testid^='cart-remove-']", "cart-item-remove-btn.png", "Botón Quitar"),
+            ("img.cart-thumb, img", "cart-item-image.png", "Thumbnail Image"),
+            (".cart-label", "cart-item-title.png", "Product Title"),
+            (".item-details .cart-meta:first-of-type", "cart-item-description.png", "Product Description"),
+            ("[data-testid^='cart-decrease-']", "cart-item-decrease-btn.png", "Decrease Button (-)"),
+            ("[data-testid^='cart-increase-']", "cart-item-increase-btn.png", "Increase Button (+)"),
+            ("button.remove, [data-testid^='cart-remove-']", "cart-item-remove-btn.png", "Remove Button"),
         ],
         "svelte": [
-            ("img", "cart-item-image.png", "Imagen Miniatura"),
-            (".item-details h2", "cart-item-title.png", "Título Producto"),
-            (".item-controls button:first-of-type", "cart-item-decrease-btn.png", "Botón Menos (-)"),
-            (".item-controls button:last-of-type", "cart-item-increase-btn.png", "Botón Más (+)"),
-            ("button.remove-button", "cart-item-remove-btn.png", "Botón Remove"),
+            ("img", "cart-item-image.png", "Thumbnail Image"),
+            (".item-details h2", "cart-item-title.png", "Product Title"),
+            (".item-controls button:first-of-type", "cart-item-decrease-btn.png", "Decrease Button (-)"),
+            (".item-controls button:last-of-type", "cart-item-increase-btn.png", "Increase Button (+)"),
+            ("button.remove-button", "cart-item-remove-btn.png", "Remove Button"),
         ],
     }
 
@@ -217,7 +223,7 @@ def _harvest_cart_item(page: Page, env_name: str, base_output_dir: Path, product
         loc = target_row.locator(sub_sel).first
         _capture_locator(loc, cart_item_dir / filename, f"{env_name}: {label}")
 
-    # Limpiar el producto del carrito tras capturar los templates
+    # Clean up the item from the cart after capturing templates
     try:
         remove_selectors = {
             "react": "[data-testid='remove-item-button']",
@@ -228,20 +234,20 @@ def _harvest_cart_item(page: Page, env_name: str, base_output_dir: Path, product
         if rem_btn.is_visible():
             rem_btn.click()
             page.wait_for_timeout(400)
-            print(f"    [CLEANUP] Ítem '{product_filter}' eliminado del carrito en {env_name}.")
+            print(f"    [CLEANUP] Item '{product_filter}' removed from cart in {env_name}.")
     except Exception:
         pass
 
 
 def harvest_for_env(page: Page, env_name: str, base_url: str, product_filter: str = "basketball"):
-    """Ejecuta la captura de templates para un entorno específico."""
+    """Execute template harvesting for a specific frontend environment."""
     print(f"\n{'='*60}")
-    print(f" Iniciando recolección de templates para: {env_name.upper()} ({base_url})")
+    print(f" Starting template harvesting for: {env_name.upper()} ({base_url})")
     print(f"{'='*60}")
 
     env_selectors = SELECTORS.get(env_name)
     if not env_selectors:
-        print(f"[ERROR] No se encontraron selectores configurados para '{env_name}'.")
+        print(f"[ERROR] No selectors configured for '{env_name}'.")
         return
 
     output_dir = PLAYWRIGHT_ROOT / "templates" / env_name
@@ -249,10 +255,10 @@ def harvest_for_env(page: Page, env_name: str, base_url: str, product_filter: st
 
     logged_in = False
 
-    # 1. Fase Login
+    # 1. Login Phase
     login_config = HARVEST_PLAN["login"]
     login_url = f"{base_url}{login_config['url']}"
-    print(f"\n[1/4] Navegando a Login: {login_url}")
+    print(f"\n[1/4] Navigating to Login: {login_url}")
     try:
         page.goto(login_url, wait_until="domcontentloaded", timeout=15000)
         page.wait_for_timeout(1000)
@@ -263,7 +269,7 @@ def harvest_for_env(page: Page, env_name: str, base_url: str, product_filter: st
                 continue
             _capture_element(page, selector, output_dir / filename, f"{env_name}: {filename}")
 
-        # Realizar login para desbloquear Home y Products
+        # Perform login to unlock Home and Products
         email_sel = env_selectors.get("login_email")
         pass_sel = env_selectors.get("login_password")
         submit_sel = env_selectors.get("login_submit")
@@ -274,14 +280,14 @@ def harvest_for_env(page: Page, env_name: str, base_url: str, product_filter: st
             page.click(submit_sel)
             page.wait_for_url(f"{base_url}/", timeout=8000)
             logged_in = True
-            print("  [OK] Login autenticado correctamente.")
+            print("  [OK] Login authenticated successfully.")
     except Exception as e:
-        print(f"  [WARN] Falló el flujo de login en {env_name}: {e}")
+        print(f"  [WARN] Login flow failed in {env_name}: {e}")
 
-    # 2. Fase Home
+    # 2. Home Phase
     if logged_in:
         home_config = HARVEST_PLAN["home"]
-        print(f"\n[2/4] Procesando Home Page: {base_url}/")
+        print(f"\n[2/4] Processing Home Page: {base_url}/")
         try:
             page.goto(f"{base_url}/", wait_until="domcontentloaded", timeout=10000)
             page.wait_for_timeout(1000)
@@ -292,12 +298,12 @@ def harvest_for_env(page: Page, env_name: str, base_url: str, product_filter: st
                     continue
                 _capture_element(page, selector, output_dir / filename, f"{env_name}: {filename}")
         except Exception as e:
-            print(f"  [WARN] Error procesando Home en {env_name}: {e}")
+            print(f"  [WARN] Error processing Home in {env_name}: {e}")
 
-    # 3. Fase Products & Product Card
+    # 3. Products & Product Card Phase
     products_config = HARVEST_PLAN["products"]
     products_url = f"{base_url}{products_config['url']}"
-    print(f"\n[3/4] Navegando a Products: {products_url}")
+    print(f"\n[3/4] Navigating to Products: {products_url}")
     try:
         page.goto(products_url, wait_until="domcontentloaded", timeout=10000)
         page.wait_for_timeout(1000)
@@ -308,12 +314,12 @@ def harvest_for_env(page: Page, env_name: str, base_url: str, product_filter: st
                 continue
             _capture_element(page, selector, output_dir / filename, f"{env_name}: {filename}")
 
-        # Recolectar templates de la tarjeta seleccionada (e.g. basketball)
+        # Harvest templates for the selected product card (e.g., basketball)
         target_card = _harvest_product_card(page, env_name, output_dir, product_filter)
 
-        # 4. Fase Cart & Cart Item (agregar el producto y navegar a /cart)
+        # 4. Cart & Cart Item Phase (add product to cart and navigate to /cart)
         if target_card is not None:
-            print(f"\n[4/4] Agregando '{product_filter}' al carrito y navegando a /cart en {env_name}...")
+            print(f"\n[4/4] Adding '{product_filter}' to cart and navigating to /cart in {env_name}...")
             add_btn = target_card.locator("button, .add, .button-primary, [role='button'].add").first
             add_btn.click()
             page.wait_for_timeout(600)
@@ -328,9 +334,9 @@ def harvest_for_env(page: Page, env_name: str, base_url: str, product_filter: st
             _harvest_cart_item(page, env_name, output_dir, product_filter)
 
     except Exception as e:
-        print(f"  [WARN] Error procesando Products/Cart en {env_name}: {e}")
+        print(f"  [WARN] Error processing Products/Cart in {env_name}: {e}")
 
-    print(f"\n [COMPLETO] Templates de {env_name.upper()} guardados en: {output_dir}")
+    print(f"\n [DONE] Templates for {env_name.upper()} saved to: {output_dir}")
 
 
 def main():
@@ -357,19 +363,27 @@ def main():
     target_envs = ["react", "angular", "svelte"] if args.env == "all" else [args.env]
 
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=not args.headed)
+        browser = p.chromium.launch(
+            headless=not args.headed,
+            slow_mo=250 if args.headed else 0,
+        )
         context = browser.new_context(viewport={"width": 1280, "height": 720})
         page = context.new_page()
 
         for env_name in target_envs:
             base_url = ENV_URLS.get(env_name)
             if not base_url:
-                print(f"[SKIP] URL no definida para entorno '{env_name}'")
+                print(f"[SKIP] URL not defined for environment '{env_name}'")
                 continue
             harvest_for_env(page, env_name, base_url, product_filter=args.product)
 
         context.close()
         browser.close()
+
+    # Record the OS platform on which the templates were rendered
+    os_marker = PLAYWRIGHT_ROOT / "templates" / ".harvested_os"
+    os_marker.parent.mkdir(parents=True, exist_ok=True)
+    os_marker.write_text(platform.system(), encoding="utf-8")
 
 
 if __name__ == "__main__":

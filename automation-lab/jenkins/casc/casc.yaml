@@ -1,0 +1,31 @@
+jenkins:
+  systemMessage: "Automation Lab CI — Local Thesis Benchmark Environment"
+  numExecutors: 0
+  slaveAgentPort: 50000
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "${JENKINS_ADMIN_ID}"
+          password: "${JENKINS_ADMIN_PASSWORD}"
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+  nodes:
+    - permanent:
+        name: "pw-agent"
+        labelString: "playwright"
+        numExecutors: 1
+        remoteFS: "/home/jenkins/agent"
+        launcher:
+          inbound:
+            workDirSettings:
+              disabled: false
+              internalDir: "remoting"
+              failIfWorkDirIsMissing: false
+unclassified:
+  location:
+    url: "http://localhost:8088/"
+jobs:
+  - file: /var/jenkins_casc/jobs.groovy
+
