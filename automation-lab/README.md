@@ -49,6 +49,7 @@ La funcionalidad es la misma en los tres frontends: al hacer click, se agrega el
 | angular | 4200 | Frontend Angular (Nginx en contenedor) |
 | svelte | 5173 | Frontend Svelte |
 | vision-service | 8001 | Detección visual de elementos UI (OpenCV + OCR). Ver `vision-service/README.md` |
+| jenkins | 8088 | Servidor CI/CD Jenkins LTS preconfigurado con JCasC y Job DSL (`admin` / `admin123`) |
 
 ## Requisitos Previos
 
@@ -100,6 +101,20 @@ Notas de compatibilidad:
 - `frontend-angular`: implementación UI en Angular.
 - `frontend-svelte`: implementación UI en Svelte.
 - `assets`: recursos compartidos usados por backend y frontends.
+- `jenkins`: infraestructura CI/CD declarativa (`controller/Dockerfile`, `controller/plugins.txt`, `casc/casc.yaml`, `casc/jobs.groovy`) y script `start-local-agent.ps1` para conectar el nodo `pw-agent` en Windows.
+
+## CI/CD con Jenkins y Agente Local (`pw-agent`)
+
+Al ejecutar `docker compose up -d`, se levanta automáticamente el contenedor `automation-lab-jenkins` en http://localhost:8088 (`admin` / `admin123`) con todos sus plugins y jobs aprovisionados mediante **Configuration as Code (JCasC)** y **Job DSL**.
+
+Para que los pipelines de Jenkins puedan ejecutar las pruebas de `automation-playwright` utilizando el entorno virtual local de Windows (`.venv`), mantener consistencia tipográfica en el Template Matching de OpenCV y permitir abrir el navegador visible en pantalla (`HEADED=true`), **se debe iniciar el agente local `pw-agent`** en una terminal PowerShell:
+
+```powershell
+# Desde la raíz del repositorio (o desde automation-lab/jenkins)
+.\automation-lab\jenkins\start-local-agent.ps1
+```
+
+> **Nota:** En `docker-compose.yml` también se incluye un servicio `pw-agent` contenedorizado bajo el perfil opcional `linux-agent` (`docker compose --profile linux-agent up -d`) para entornos Linux sin escritorio gráfico. Por defecto se encuentra desactivado para no colisionar con `start-local-agent.ps1`.
 
 
 ## Servicio vision y Docker Compose
