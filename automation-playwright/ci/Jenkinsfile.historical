@@ -1,0 +1,37 @@
+// automation-playwright/ci/Jenkinsfile.historical
+// Pipeline dedicated to consolidating historical metrics from `metrics-history/`
+// and rendering the 5 scientific charts (`reports/historical_dashboard.html`).
+
+int winSize = (params.WINDOW_SIZE ?: '5').toInteger()
+
+def runCmd(String cmd) {
+    if (isUnix()) {
+        sh cmd
+    } else {
+        bat cmd
+    }
+}
+
+try {
+    stage("1. Consolidate Historical Metrics (K=${winSize})") {
+        runCmd("python ci/build_historical_dashboard.py --window-size ${winSize}")
+    }
+} finally {
+    stage('Publish Historical Dashboard & Artifacts') {
+        try {
+            publishHTML(target: [
+                allowMissing: true,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: 'reports',
+                reportFiles: 'historical_dashboard.html',
+                reportName: 'Historical Metrics Dashboard',
+                reportTitles: 'Automation Lab Historical & Scientific Dashboard'
+            ])
+        } catch (Throwable htmlErr) {
+            echo "[WARN] publishHTML skipped or failed: ${htmlErr}"
+        }
+
+        archiveArtifacts artifacts: 'reports/historical_dashboard.html, metrics-history/*.csv, metrics-history/*.jsonl', allowEmptyArchive: true
+    }
+}

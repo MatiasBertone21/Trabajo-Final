@@ -31,6 +31,12 @@ pip install -r requirements.txt
 playwright install chromium
 ```
 
+### 3. Conectar el agente local de Jenkins (`pw-agent`) y ejecutar pipelines CI/CD
+Con el contenedor `jenkins` corriendo en `http://localhost:8088` (`admin` / `admin123`), levantar en una terminal PowerShell el agente local de Windows para habilitar la ejecución de los jobs (`harvest-templates`, `run-e2e-tests`, `historical-dashboard`) sobre el `.venv` local y soportar modo `--headed`:
+```powershell
+.\automation-lab\jenkins\start-local-agent.ps1
+```
+
 ---
 
 ## Flujo de Trabajo 📦

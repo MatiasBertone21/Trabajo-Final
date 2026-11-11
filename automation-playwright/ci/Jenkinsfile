@@ -1,0 +1,135 @@
+// automation-playwright/ci/Jenkinsfile
+// Loaded dynamically inside node('playwright') { dir(pwDir) { ... } }
+
+def selectedStrategy = (params.STRATEGY ?: 'base').trim()
+def selectedFrontend = (params.FRONTEND ?: 'react').trim()
+int repeatCount      = (params.REPEAT   ?: '1').toInteger()
+boolean runWarmup    = (params.WARMUP != null) ? params.WARMUP.toBoolean() : true
+boolean isHeaded     = (params.HEADED != null) ? params.HEADED.toBoolean() : false
+
+def strategies = (selectedStrategy == 'ALL') ? ['base', 'getby', 'opencv', 'getby_full', 'opencv_full'] : [selectedStrategy]
+def frontends  = (selectedFrontend == 'ALL') ? ['react', 'angular', 'svelte'] : [selectedFrontend]
+boolean usesVision = strategies.contains('opencv') || strategies.contains('opencv_full')
+
+def runCmd(String cmd) {
+    if (isUnix()) {
+        sh cmd
+    } else {
+        bat cmd
+    }
+}
+
+try {
+    stage('1. Clean Reports') {
+        runCmd('python -c "import pathlib, shutil; r = pathlib.Path(\'reports\'); r.mkdir(exist_ok=True); [shutil.rmtree(r / d, ignore_errors=True) for d in (\'base\', \'getby\', \'opencv\', \'getby_full\', \'opencv_full\', \'smoke\')]; [p.unlink(missing_ok=True) for pat in (\'*.xml\', \'*.csv\', \'dashboard.html\') for p in r.glob(pat)]"')
+    }
+
+    stage('2. Healthchecks') {
+        runCmd('python ci/wait_for_services.py')
+    }
+
+    if (usesVision) {
+        stage('2.5 Verify Vision Templates') {
+            runCmd('python -c "import pathlib, platform, subprocess, sys; t = pathlib.Path(\'templates\'); m = t / \'.harvested_os\'; saved = m.read_text(encoding=\'utf-8\').strip() if m.exists() else \'none\'; cur = platform.system(); missing = any(not (t / fe / \'cart-item\').exists() for fe in (\'react\', \'angular\', \'svelte\')); print(f\'[Templates] OS actual={cur}, OS templates={saved}, missing={missing}\'); subprocess.run([sys.executable, \'-m\', \'utils.harvest_templates\', \'--env\', \'all\'], check=True) if (saved != cur or missing) else None"')
+        }
+    }
+
+    if (runWarmup && usesVision) {
+        stage('3. Vision Warm-up') {
+            runCmd('python -c "import cv2, numpy as np, requests; img = np.zeros((120, 300, 3), dtype=np.uint8); cv2.putText(img, \'Add to cart\', (20, 70), cv2.FONT_HERSHEY_SIMPLEX, 1.0, (255, 255, 255), 2); _, buf = cv2.imencode(\'.png\', img); r = requests.post(\'http://localhost:8001/api/vision/detect\', files={\'file\': (\'warmup.png\', buf.tobytes(), \'image/png\')}, params={\'enable_ocr\': \'true\', \'target_description\': \'Add to cart\'}, timeout=60); print(\'[Warm-up] vision-service status:\', r.status_code)"')
+        }
+    }
+
+    def headedArgs = isHeaded ? '--headed --slowmo=250' : ''
+
+    for (int sIdx = 0; sIdx < strategies.size(); sIdx++) {
+        def strat = strategies[sIdx]
+        def testTarget = 'tests/test_products.py'
+        if (strat == 'opencv_full') {
+            testTarget = 'tests/test_full_vision_flow.py'
+        } else if (strat == 'getby_full') {
+            testTarget = 'tests/test_full_getby_flow.py'
+        }
+
+        for (int fIdx = 0; fIdx < frontends.size(); fIdx++) {
+            def fe = frontends[fIdx]
+            stage("Run [${strat} @ ${fe}]") {
+                for (int r = 1; r <= repeatCount; r++) {
+                    def cellDir = "reports/${strat}/${fe}"
+                    def xmlPath = (repeatCount > 1)
+                        ? "${cellDir}/r${r}/junit.xml"
+                        : "${cellDir}/junit.xml"
+
+                    def pytestCmd = "pytest ${testTarget} -m ${strat} --env ${fe} --repeat-idx=${r} --telemetry-dir=${cellDir} --junitxml=${xmlPath} ${headedArgs}".trim()
+                    if (isHeaded && isUnix()) {
+                        pytestCmd = "xvfb-run -a ${pytestCmd}"
+                    }
+
+                    catchError(buildResult: 'UNSTABLE', stageResult: 'FAILURE') {
+                        runCmd(pytestCmd)
+                    }
+                }
+            }
+        }
+    }
+
+    stage('Aggregate & Build Dashboard') {
+        runCmd('python ci/build_dashboard.py')
+    }
+} finally {
+    stage('Publish JUnit, Plots & Dashboard') {
+        try {
+            junit testResults: 'reports/**/*.xml', allowEmptyResults: true, keepProperties: true, testDataPublishers: [[$class: 'AttachmentPublisher']]
+        } catch (Throwable ignored) {
+            junit testResults: 'reports/**/*.xml', allowEmptyResults: true, keepProperties: true
+        }
+
+        try {
+            plot(
+                csvFileName: 'plot-total-duration.csv',
+                csvSeries: [[file: 'reports/plot_duration_ms.csv', displayTableFlag: true, inclusionFlag: 'OFF']],
+                group: 'Automation Lab Benchmark',
+                title: 'Tiempo Total E2E por Estrategia y Frontend (Mediana ms)',
+                yaxis: 'Milisegundos (ms)',
+                style: 'line',
+                keepRecords: true
+            )
+            plot(
+                csvFileName: 'plot-step-duration.csv',
+                csvSeries: [[file: 'reports/plot_step_ms.csv', displayTableFlag: true, inclusionFlag: 'OFF']],
+                group: 'Automation Lab Benchmark',
+                title: 'Latencia del Paso por Estrategia y Frontend (Mediana ms)',
+                yaxis: 'Milisegundos (ms)',
+                style: 'line',
+                keepRecords: true
+            )
+            plot(
+                csvFileName: 'plot-pass-rate.csv',
+                csvSeries: [[file: 'reports/plot_pass_rate.csv', displayTableFlag: true, inclusionFlag: 'OFF']],
+                group: 'Automation Lab Benchmark',
+                title: 'Tasa de Exito por Estrategia y Frontend (%)',
+                yaxis: 'Porcentaje (%)',
+                style: 'line',
+                keepRecords: true
+            )
+        } catch (Throwable plotErr) {
+            echo "[WARN] Plot step skipped or failed: ${plotErr}"
+        }
+
+        try {
+            publishHTML(target: [
+                allowMissing: true,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: 'reports',
+                reportFiles: 'dashboard.html',
+                reportName: 'Benchmark Dashboard',
+                reportTitles: 'Automation Lab Comparative Dashboard'
+            ])
+        } catch (Throwable htmlErr) {
+            echo "[WARN] publishHTML skipped or failed: ${htmlErr}"
+        }
+
+        archiveArtifacts artifacts: 'reports/**/*.xml, reports/**/*.jsonl, reports/**/*.png, reports/**/*.json, reports/*.csv, reports/dashboard.html', allowEmptyArchive: true
+    }
+}

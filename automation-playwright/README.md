@@ -87,6 +87,21 @@ pytest --env=react ; pytest --env=angular ; pytest --env=svelte
 automation-playwright/
 ├── conftest.py          # Fixtures de sesión: browser, page, base_url, selectors, auth_page
 ├── pytest.ini           # testpaths, definición de markers, addopts por defecto
+├── ci/                  # Pipelines de Jenkins y generadores de reportes HTML/científicos
+│   ├── Jenkinsfile.harvest          # Pipeline Job 1: Cosecha de plantillas UI y galería
+│   ├── Jenkinsfile.test             # Pipeline Job 2: Ejecución E2E, JUnit y auditoría visual
+│   ├── Jenkinsfile.historical       # Pipeline Job 3: Consolidación histórica y 5 gráficos
+│   ├── Jenkinsfile                  # Pipeline monolítico original (benchmark)
+│   ├── wait_for_services.py         # Sonda de disponibilidad HTTP (/health) de los 5 servicios
+│   ├── build_templates_gallery.py   # Generador de reports/templates_gallery.html
+│   ├── build_vision_audit.py        # Generador de reports/vision_audit.html + sync a metrics-history/
+│   ├── build_historical_dashboard.py# Generador de reports/historical_dashboard.html (ventana K)
+│   ├── build_dashboard.py           # Generador de reports/dashboard.html (corrida única)
+│   └── reporting/                   # Paquete compartido (Template Method + gráficos Pillow)
+│       ├── base_report.py           # Clase abstracta BaseHTMLReport (CSS común y estructura HTML5)
+│       ├── charts.py                # Motor de gráficos científicos en PNG Base64 (Pillow)
+│       ├── constants.py             # Rutas, estrategias, frontends, colores y esquemas CSV
+│       └── telemetry_io.py          # Estadísticas (mediana, p95, DE), lectura JSONL/CSV y agregación
 ├── pages/
 │   ├── base_page.py     # BasePage: navigate(), get_title(), helpers visuales y get_by
 │   ├── login_page.py    # LoginPage: fill_credentials(), submit(), is_redirected_to_home()
@@ -162,10 +177,30 @@ function scope
   getby_selectors ← mapa de selectores para `get_by_*` (dict con role/name o test id)
 ```
 
-## Reports
+## CI/CD con Jenkins y Reportes (`ci/`)
 
-- El proyecto genera reportes JUnit XML (`reports/report.xml`) enriquecidos con propiedades y adjuntos visuales (`junit-attachments`) y telemetría estructurada en JSONL (`step_metrics.jsonl` y `test_summary.jsonl`).
-- Las capturas de pantalla de fallos y las escenas anotadas con *Bounding Boxes* de los flujos visuales (`opencv` y `opencv_full`) se guardan en `reports/<strategy>/<env>/vision_audit/` y `reports/screenshots/`.
+La suite se integra con el servidor **Jenkins LTS** (`http://localhost:8088`, usuario `admin` / `admin123`) definido en `automation-lab/docker-compose.yml`.
+
+### 1. Conexión obligatoria del Agente Local (`pw-agent`) en Windows
+Para que los jobs de Jenkins ejecuten Playwright sobre el entorno `.venv` local de Windows —garantizando el mismo renderizado tipográfico del sistema operativo durante el Template Matching (`TM_CCOEFF_NORMED`) y permitiendo abrir el navegador en pantalla cuando `HEADED=true`—, **se debe dejar corriendo el script del agente local** en una ventana de PowerShell antes de lanzar un build:
+
+```powershell
+# Desde la raíz del repositorio
+.\automation-lab\jenkins\start-local-agent.ps1
+```
+
+### 2. Flujo Modular de 3 Jobs en Jenkins
+1. **`harvest-templates` (`ci/Jenkinsfile.harvest`):**
+   - Ejecuta `utils/harvest_templates.py` para capturar las plantillas UI 1:1 (`templates/{env}/`) en React, Angular y Svelte, archiva los recortes PNG y publica el catálogo auditable **`Templates Gallery (OpenVisor)`** (`reports/templates_gallery.html`).
+2. **`run-e2e-tests` (`ci/Jenkinsfile.test`):**
+   - Permite ejecutar cualquier combinación de `STRATEGY` (`base`, `getby`, `opencv`, `getby_full`, `opencv_full`, `ALL`), `FRONTEND` (`react`, `angular`, `svelte`, `ALL`), repeticiones (`REPEAT`), precalentamiento de EasyOCR (`WARMUP`) y modo visual (`HEADED`).
+   - Publica resultados JUnit, genera el reporte **`OpenVisor Visual Audit`** (`reports/vision_audit.html`) agrupado por test con capturas anotadas (*Bounding Boxes*, *Center Point* y metadatos de tiempo/confianza por paso) y sincroniza la telemetría de texto en `metrics-history/`.
+3. **`historical-dashboard` (`ci/Jenkinsfile.historical`):**
+   - Consolida las últimas `K` ejecuciones históricas (`WINDOW_SIZE`, por defecto `5`) desde `metrics-history/` sin abrir el navegador ni duplicar imágenes pesadas.
+   - Publica el **`Historical Benchmark Dashboard`** (`reports/historical_dashboard.html`) con la tabla experimental consolidada, el desglose paso a paso (`getby_full` vs `opencv_full`) y **5 gráficos científicos embebidos en Base64 PNG**.
+
+### 3. Arquitectura del Paquete de Reportes (`ci/reporting/`)
+Todos los generadores (`build_templates_gallery.py`, `build_vision_audit.py`, `build_historical_dashboard.py` y `build_dashboard.py`) heredan de la clase abstracta **`BaseHTMLReport`** (`ci/reporting/base_report.py`) siguiendo el patrón **Template Method**, reutilizando la hoja de estilos común compatible con Jenkins CSP, el motor de gráficos con Pillow (`ci/reporting/charts.py`) y el agregador estadístico (`ci/reporting/telemetry_io.py`).
 
 ---
 

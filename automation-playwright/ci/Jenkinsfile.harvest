@@ -1,0 +1,53 @@
+// automation-playwright/ci/Jenkinsfile.harvest
+// Pipeline dedicated to harvesting UI visual templates and publishing an auditable catalog in Jenkins.
+
+def selectedFrontend = (params.FRONTEND ?: 'ALL').trim()
+def targetProduct    = (params.PRODUCT  ?: 'basketball').trim()
+boolean isHeaded     = (params.HEADED != null) ? params.HEADED.toBoolean() : false
+
+def envArg     = (selectedFrontend == 'ALL') ? 'all' : selectedFrontend
+def headedFlag = isHeaded ? '--headed' : ''
+
+def runCmd(String cmd) {
+    if (isUnix()) {
+        sh cmd
+    } else {
+        bat cmd
+    }
+}
+
+try {
+    stage('1. Healthchecks') {
+        runCmd('python ci/wait_for_services.py')
+    }
+
+    stage("2. Harvest Templates [env=${envArg}, headed=${isHeaded}]") {
+        def harvestCmd = "python -m utils.harvest_templates --env ${envArg} --product ${targetProduct} ${headedFlag}".trim()
+        if (isHeaded && isUnix()) {
+            harvestCmd = "xvfb-run -a ${harvestCmd}"
+        }
+        runCmd(harvestCmd)
+    }
+
+    stage('3. Build Templates Validation Gallery') {
+        runCmd('python ci/build_templates_gallery.py')
+    }
+} finally {
+    stage('Publish Templates Catalog & Artifacts') {
+        try {
+            publishHTML(target: [
+                allowMissing: true,
+                alwaysLinkToLastBuild: true,
+                keepAll: true,
+                reportDir: 'reports',
+                reportFiles: 'templates_gallery.html',
+                reportName: 'Templates Catalog',
+                reportTitles: 'OpenVisor Visual Templates Catalog'
+            ])
+        } catch (Throwable htmlErr) {
+            echo "[WARN] publishHTML skipped or failed: ${htmlErr}"
+        }
+
+        archiveArtifacts artifacts: 'templates/**/*.png, templates/.harvested_os, reports/templates_gallery.html', allowEmptyArchive: true
+    }
+}
